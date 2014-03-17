@@ -3,6 +3,9 @@
 <div class="payment_module" style="border: 1px solid #595A5E; padding: 0.6em; margin-left: 0.7em;">
     <p id="twocheckout-error" style="border: 1px solid red; padding: 0.6em; margin-bottom: 0.7em; color: red; background: #FFF">{l s='Payment Authorization Failed: Please verify your Credit Card details are entered correctly and try again, or try another payment method.' mod='twocheckout'}</p>
     <h3 class="twocheckout_title"><img alt="" src="{$module_dir}assets/secure-icon.png" />{l s='Pay by credit card with our secured payment server' mod='twocheckout'}</h3>
+    <div class="error" style="display:none" id="twocheckout_error_creditcard">
+    <p>{l s='Payment Authorization Failed: Please verify your Credit Card details are entered correctly and try again, or try another payment method.' mod='twocheckout'}</p>
+    </div>    
     <form action="{$module_dir}validation.php" method="POST" id="twocheckoutCCForm" onsubmit="return false">
         <input id="sellerId" type="hidden" value="{$twocheckout_sid}">
         <input id="publishableKey" type="hidden" value="{$twocheckout_public_key}">
@@ -66,14 +69,18 @@
     clearFields(); 
     if (data.errorCode === 200) {
       TCO.requestToken(successCallback, errorCallback, 'tcoCCForm');
+    } else if(data.errorCode == 401) {
+      $("#twocheckout_error_creditcard").show();
     } else {
       alert(data.errorMsg);
-    }       
+    } 
   }
 
-  function retrieveToken() {
+  $("#twocheckoutCCForm").submit(function (e) {
+    e.preventDefault();
+    $("#twocheckout_error_creditcard").hide();
     TCO.requestToken(successCallback, errorCallback, 'twocheckoutCCForm');
-  }
+  });
 
   (function($) {
     $.QueryString = (function(a) {
