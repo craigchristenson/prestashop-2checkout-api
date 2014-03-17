@@ -145,7 +145,7 @@ class Twocheckout extends PaymentModule
 
     function processPayment($token)
     {
-        include(dirname(__FILE__).'/lib/Twocheckout/TwocheckoutAPI.php');
+        include(dirname(__FILE__).'/lib/Twocheckout/TwocheckoutApi.php');
 
         $cart = $this->context->cart;
         $user = $this->context->customer;
