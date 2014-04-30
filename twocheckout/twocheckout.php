@@ -179,7 +179,7 @@ class Twocheckout extends PaymentModule
                     "addrLine1" => $invoice->address1,
                     "addrLine2" => $invoice->address2,
                     "city" => $invoice->city,
-                    "state" => $invoice->state,
+                    "state" => ($invoice->country == "United States" || $invoice->country == "Canada") ? State::getNameById($invoice->id_state) : 'XX',
                     "zipCode" => $invoice->postcode,
                     "country" => $invoice->country,
                     "email" => $customer->email,
@@ -193,7 +193,7 @@ class Twocheckout extends PaymentModule
                     "addrLine1" => $delivery->address1,
                     "addrLine2" => $delivery->address2,
                     "city" => $delivery->city,
-                    "state" => $delivery->state,
+                    "state" => (Validate::isLoadedObject($delivery) AND $delivery->id_state) ? new State(intval($delivery->id_state)) : 'XX',
                     "zipCode" => $delivery->postcode,
                     "country" => $delivery->country
                 );
