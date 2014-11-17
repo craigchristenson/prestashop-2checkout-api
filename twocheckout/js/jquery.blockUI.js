@@ -4,7 +4,7 @@
  * Requires jQuery v1.7 or later
  *
  * Examples at: http://malsup.com/jquery/block/
- * Copyright (c) 2007-2013 M. Alsup
+ * Copyright (c) 2007-2014 M. Alsup
  * Dual licensed under the MIT and GPL licenses:
  * http://www.opensource.org/licenses/mit-license.php
  * http://www.gnu.org/licenses/gpl.html
