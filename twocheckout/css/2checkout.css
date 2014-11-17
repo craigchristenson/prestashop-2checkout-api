@@ -1,0 +1,11 @@
+#HOOK_PAYMENT #twocheckout_payment_module {border: 1px solid #d6d4d4; border-radius: 4px; padding: 0px 10px 0px 15px;}
+#HOOK_PAYMENT #twocheckout-error {border: 1px solid red; padding: 0.6em; margin-bottom: 0.7em; color: red; background: #FFF}
+#HOOK_PAYMENT #secure-icon {padding: 0 5px 5px 0;}
+#HOOK_PAYMENT #ccNo {width: 210px; border: #CCCCCC solid 1px; padding: 3px;}
+#HOOK_PAYMENT #expMonth,
+#HOOK_PAYMENT #expYear,
+#HOOK_PAYMENT #cvv {border: #CCCCCC solid 1px; padding: 3px;}
+#HOOK_PAYMENT #submit_payment {background-image: linear-gradient(#00D02A, #19B700); color: white; border: 2px solid #F9F7F7;}
+#HOOK_PAYMENT #submit_payment:hover,
+#HOOK_PAYMENT #submit_payment:active {background-position: initial; background-image: linear-gradient(#03E531, #19B700);}
+#order-opc .blockUI h1, #order {margin-top: 9px;}
