@@ -57,7 +57,7 @@
             <input class="numeric" id="cvv" type="text" size="4" autocomplete="off"  style="border: #CCCCCC solid 1px; padding: 3px;" required />
         </div>
         <br />
-        <input type="submit" class="button" onclick="retrieveToken()" value="{l s='Submit Payment' mod='twocheckout'}" />
+        <input type="submit" class="button" value="{l s='Submit Payment' mod='twocheckout'}" />
         <div class="block-right">
             <img src="{$module_dir}assets/credit-cards.png" />
         </div>
