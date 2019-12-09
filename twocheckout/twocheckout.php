@@ -1,5 +1,5 @@
 <?php
-
+use PrestaShop\PrestaShop\Core\Payment\PaymentOption;
 if (!defined('_PS_VERSION_'))
     exit;
 
@@ -13,7 +13,7 @@ class Twocheckout extends PaymentModule
         $this->name = 'twocheckout';
         $this->displayName = '2Checkout Payment API';
         $this->tab = 'payments_gateways';
-        $this->version = 0.1;
+        $this->version = 0.2;
 
 
         $config = Configuration::getMultiple(array('TWOCHECKOUT_SID', 'TWOCHECKOUT_PUBLIC', 'TWOCHECKOUT_PRIVATE',
@@ -49,11 +49,10 @@ class Twocheckout extends PaymentModule
         }
     }
 
-
     function install()
     {
         //Call PaymentModule default install function
-        $install = parent::install() && $this->registerHook('payment') && $this->registerHook('header') && $this->registerHook('orderConfirmation');
+        $install = parent::install() && $this->registerHook('paymentOptions') && $this->registerHook('header');
         //Create Valid Currencies
         $currencies = Currency::getCurrencies();
         $authorized_currencies = array();
@@ -64,7 +63,6 @@ class Twocheckout extends PaymentModule
         return $install;
     }
 
-
     function uninstall()
     {
         Configuration::deleteByName('TWOCHECKOUT_SID');
@@ -72,34 +70,44 @@ class Twocheckout extends PaymentModule
         Configuration::deleteByName('TWOCHECKOUT_PRIVATE');
         Configuration::deleteByName('TWOCHECKOUT_SANDBOX');
         Configuration::deleteByName('TWOCHECKOUT_CURRENCIES');
-        return $this->unregisterHook('payment') && $this->unregisterHook('paymentReturn') && parent::uninstall();
+        return $this->unregisterHook('paymentOptions') && $this->unregisterHook('header') && parent::uninstall();
     }
-
 
     public function hookDisplayMobileHeader()
     {
         return $this->hookHeader();
     }
 
-
     public function hookHeader()
     {
         if (Tools::getValue('controller') != 'order-opc' && (!($_SERVER['PHP_SELF'] == __PS_BASE_URI__.'order.php' || $_SERVER['PHP_SELF'] == __PS_BASE_URI__.'order-opc.php' || Tools::getValue('controller') == 'order' || Tools::getValue('controller') == 'orderopc' || Tools::getValue('step') == 3)))
             return;
-
-        if (Configuration::get('TWOCHECKOUT_SANDBOX')) {
-            $output = '<script type="text/javascript" src="https://sandbox.2checkout.com/checkout/api/script/publickey/'.Configuration::get('TWOCHECKOUT_SID').'"></script>';
-        } else {
-            $output = '
-            <script type="text/javascript" src="https://www.2checkout.com/checkout/api/script/publickey/'.Configuration::get('TWOCHECKOUT_SID').'"></script>';
-        }
-
-        $this->smarty->assign('twocheckout_sid', Configuration::get('TWOCHECKOUT_SID'));
-        $this->smarty->assign('twocheckout_public_key', Configuration::get('TWOCHECKOUT_PUBLIC'));
-
-        return $output;
+		
+		$this->context->controller->registerJavascript(
+		'remote-2checkout',
+		'https://www.2checkout.com/checkout/api/script/publickey/'.Configuration::get('TWOCHECKOUT_SID'),
+		['position' => 'head', 'server' => 'remote']
+		);
+		
+		$this->context->controller->registerJavascript(
+		'remote-2checkout-min',
+		'https://www.2checkout.com/checkout/api/2co.min.js',
+		['position' => 'head', 'server' => 'remote']
+		);
+		
+		$this->context->controller->registerJavascript(
+        '2checkout-module-block-ui-script',
+        'modules/'.$this->name.'/assets/jquery.blockUI.js',
+        ['position' => 'bottom']
+		);
+		
+		$this->context->controller->registerJavascript(
+        '2checkout-module-script',
+        'modules/'.$this->name.'/assets/script.js',
+        ['position' => 'bottom']
+		);
+        
     }
-
 
     function getContent()
     {
@@ -142,13 +150,14 @@ class Twocheckout extends PaymentModule
         return $this->_html;
     }
 
-
     function processPayment($token)
     {
         include(dirname(__FILE__).'/lib/Twocheckout/TwocheckoutApi.php');
 
-        $cart = $this->context->cart;
-        $user = $this->context->customer;
+        $twocheckout = Module::getInstanceByName('twocheckout');
+        $context = Context::getContext();
+        $cart = $context->cart;
+        $user = $context->customer;
         $delivery = new Address(intval($cart->id_address_delivery));
         $invoice = new Address(intval($cart->id_address_invoice));
         $customer = new Customer(intval($cart->id_customer));
@@ -187,6 +196,11 @@ class Twocheckout extends PaymentModule
                 )
             );
 
+            // this is for demo sale transaction
+            if (Configuration::get('TWOCHECKOUT_SANDBOX')) {
+                $params["demo"] = true;
+            }
+
             if ($delivery) {
                 $shippingAddr = array(
                     "name" => $delivery->firstname . ' ' . $delivery->lastname,
@@ -200,11 +214,7 @@ class Twocheckout extends PaymentModule
                 array_merge($shippingAddr, $params);
             }
 
-            if (Configuration::get('TWOCHECKOUT_SANDBOX')) {
-                TwocheckoutApi::setCredentials(Configuration::get('TWOCHECKOUT_SID'), Configuration::get('TWOCHECKOUT_PRIVATE'), 'sandbox');
-            } else {
-                TwocheckoutApi::setCredentials(Configuration::get('TWOCHECKOUT_SID'), Configuration::get('TWOCHECKOUT_PRIVATE'));
-            }
+            TwocheckoutApi::setCredentials(Configuration::get('TWOCHECKOUT_SID'), Configuration::get('TWOCHECKOUT_PRIVATE'));
             $charge = Twocheckout_Charge::auth($params);
 
         } catch (Twocheckout_Error $e) {
@@ -215,43 +225,48 @@ class Twocheckout extends PaymentModule
         if (isset($charge['response']['responseCode'])) {
             $order_status = (int)Configuration::get('TWOCHECKOUT_ORDER_STATUS');
             $message = $charge['response']['responseMsg'];
-            $this->validateOrder((int)$this->context->cart->id, _PS_OS_PAYMENT_, $charge['response']['total'], $this->displayName, $message, array(), null, false, $this->context->customer->secure_key);
-            Tools::redirect('index.php?controller=order-confirmation?key=' . $user->secure_key . '&id_cart=' . (int)
-                $cart->id . '&id_module=' . (int) $this->module->id . '&id_order=' . (int) $this->module->currentOrder);
+            $twocheckout->validateOrder((int)$cart->id, _PS_OS_PAYMENT_, $charge['response']['total'], $twocheckout->displayName, $message, array(), null, false, $user->secure_key);
+            Tools::redirect('index.php?controller=order-confirmation&id_cart='.$cart->id.'&id_module='
+                .$twocheckout->id.'&id_order='.$twocheckout->currentOrder.'&key='.$user->secure_key);
         } else {
             $message = 'Payment Authorization Failed';
             Tools::redirect('index.php?controller=order&step=3&twocheckouterror='.$message);
         }
     }
 
-
-    function hookPayment($params)
+    public function hookPaymentOptions($params)
     {
-        global $smarty;
-        $smarty->assign(array(
-        'this_path' 		=> $this->_path,
-        'this_path_ssl' 	=> Configuration::get('PS_FO_PROTOCOL').$_SERVER['HTTP_HOST'].__PS_BASE_URI__."modules/{$this->name}/"));
-
-        return $this->display(__FILE__, 'payment_execution.tpl');
+        if (!$this->active) {
+            return;
+        }
+        if (!Currency::getCurrencies()) {
+            return;
+        }
+        $payment_options = [
+            $this->get2CheckoutPaymentOption(),
+        ];
+        return $payment_options;
     }
-
-
-    function hookPaymentReturn($params)
+	
+    public function get2CheckoutPaymentOption()
     {
-        global $smarty;
-        $state = $params['objOrder']->getCurrentState();
-        if ($state == _PS_OS_OUTOFSTOCK_ or $state == _PS_OS_PAYMENT_)
-            $smarty->assign(array(
-                'total_to_pay' 	=> Tools::displayPrice($params['total_to_pay'], $params['currencyObj'], false, false),
-                'status' 		=> 'ok',
-                'id_order' 		=> $params['objOrder']->id
-            ));
-        else
-            $smarty->assign('status', 'failed');
-
-        return $this->display(__FILE__, 'payment_return.tpl');
+        $embeddedOption = new PaymentOption();
+		$embeddedOption->setBinary(true);
+        $embeddedOption->setCallToActionText($this->l('2Checkout'))
+			->setModuleName($this->l('2Checkout'))
+            ->setForm($this->generateForm());
+        return $embeddedOption;
     }
-
+	
+	protected function generateForm()
+    {
+        $this->context->smarty->assign([
+			'twocheckout_sid' => Configuration::get('TWOCHECKOUT_SID'),
+			'twocheckout_public_key' => Configuration::get('TWOCHECKOUT_PUBLIC'),
+            'module_dir' => _MODULE_DIR_.$this->name.'/',
+        ]);
+       return $this->context->smarty->fetch('module:twocheckout/payment_execution.tpl');
+    }
 
     private function _postValidation()
     {
@@ -272,45 +287,19 @@ class Twocheckout extends PaymentModule
         }
     }
 
-
     private function _postProcess()
     {
         $ok = $this->l('Ok');
         $updated = $this->l('Settings Updated');
-        $this->_html .= "<div class='conf confirm'><img src='../img/admin/ok.gif' alt='{$ok}' />{$updated}</div>";
+        $this->_html .= "<div class='conf confirm'><img src='../img/admin/enabled.gif' alt='{$ok}' />{$updated}</div>";
     }
-
-
-    public function hookOrderConfirmation($params)
-    {
-        if (!isset($params['objOrder']) || ($params['objOrder']->module != $this->name))
-            return false;
-        
-        if ($params['objOrder'] && Validate::isLoadedObject($params['objOrder']) && isset($params['objOrder']->valid))
-
-            $this->smarty->assign('order', array('reference' => isset($params['objOrder']->reference) ? $params['objOrder']->reference : '#'.sprintf('%06d', $params['objOrder']->id), 'valid' => $params['objOrder']->valid));
-
-            $pendingOrderStatus = (int)Configuration::get('TWOCHECKOUT_PENDING_ORDER_STATUS');
-            $currentOrderStatus = (int)$params['objOrder']->getCurrentState();
-            if ($pendingOrderStatus==$currentOrderStatus) {
-                $this->smarty->assign('order_pending', true);
-            } else {
-                $this->smarty->assign('order_pending', false);
-            }
-
-        return $this->display(__FILE__, 'order-confirmation.tpl');
-
-    }
-
-
-
 
     private function _displaycheckout()
     {
         $modDesc 	= $this->l('This module allows you to accept payments using 2Checkout\'s Payment API services.');
         $modStatus	= $this->l('2Checkout\'s online payment service could be the right solution for you');
         $modconfirm	= $this->l('');
-        $this->_html .= "<img src='../modules/checkout/2Checkout.gif' style='float:left; margin-right:15px;' />
+        $this->_html .= "<img src='../modules/twocheckout/2Checkout.gif' style='float:left; margin-right:15px;' />
                                         <b>{$modDesc}</b>
                                         <br />
                                         <br />
@@ -322,9 +311,6 @@ class Twocheckout extends PaymentModule
                                         <br />";
     }
 
-
-
-
     private function _displayForm()
     {
         $modcheckout	            = $this->l('2Checkout Setup');
@@ -335,7 +321,7 @@ class Twocheckout extends PaymentModule
         $modClientValuePublic	    = Configuration::get('TWOCHECKOUT_PUBLIC');
         $modClientLabelPrivate	    = $this->l('Private Key');
         $modClientValuePrivate	    = Configuration::get('TWOCHECKOUT_PRIVATE');
-        $modClientLabelSandbox      = $this->l('Use Sandbox?');
+        $modClientLabelSandbox      = $this->l('Demo Sale?');
         $modClientValueSandbox      = Configuration::get('TWOCHECKOUT_SANDBOX');
         $modCurrencies		        = $this->l('Currencies');
         $modUpdateSettings 	        = $this->l('Update settings');
@@ -347,7 +333,7 @@ class Twocheckout extends PaymentModule
         <br />
         <p><form action='{$_SERVER['REQUEST_URI']}' method='post'>
                 <fieldset>
-                <legend><img src='../img/admin/access.png' />{$modcheckout}</legend>
+                <legend><img src='../img/admin/cart.gif' />{$modcheckout}</legend>
                         <table border='0' width='500' cellpadding='0' cellspacing='0' id='form'>
                                 <tr>
                                         <td colspan='2'>
@@ -372,7 +358,7 @@ class Twocheckout extends PaymentModule
                                                 <input type='text' name='PRIVATE' value='{$modClientValuePrivate}' style='width: 300px;' />
                                         </td>
                                 </tr>
-                                <tr>
+                                 <tr>
                                         <td width='130'>{$modClientLabelSandbox}</td>
                                         <td>
                                             <input type='radio' name='SANDBOX' value='0'".(!$modClientValueSandbox ? " checked='checked'" : '')." /> No
@@ -422,7 +408,7 @@ class Twocheckout extends PaymentModule
                         </table>
                 </fieldset>
         </form>";
-    }
+    }	
 }
 
 ?>

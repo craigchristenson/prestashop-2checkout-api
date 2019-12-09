@@ -1,5 +1,3 @@
-<script type="text/javascript" src="{$module_dir}assets/jquery.blockUI.js"></script>
-<script type="text/javascript"src="https://www.2checkout.com/checkout/api/2co.min.js"/></script>
 <div class="payment_module" style="border: 1px solid #595A5E; padding: 0.6em; margin-left: 0.7em;">
     <p id="twocheckout-error" style="border: 1px solid red; padding: 0.6em; margin-bottom: 0.7em; color: red; background: #FFF">{l s='Payment Authorization Failed: Please verify your Credit Card details are entered correctly and try again, or try another payment method.' mod='twocheckout'}</p>
     <h3 class="twocheckout_title"><img alt="" src="{$module_dir}assets/secure-icon.png" />{l s='Pay by credit card with our secured payment server' mod='twocheckout'}</h3>
@@ -33,10 +31,6 @@
             </select>
             <span> / </span>
             <select id="expYear" name="year" style="border: #CCCCCC solid 1px; padding: 3px;" required>
-                <option value="2015">2015</option>
-                <option value="2016">2016</option>
-                <option value="2017">2017</option>
-                <option value="2018">2018</option>
                 <option value="2019">2019</option>
                 <option value="2020">2020</option>
                 <option value="2021">2021</option>
@@ -49,6 +43,10 @@
                 <option value="2028">2028</option>
                 <option value="2029">2029</option>
                 <option value="2030">2030</option>
+		        <option value="2031">2031</option>
+                <option value="2032">2032</option>
+                <option value="2033">2033</option>
+                <option value="2034">2034</option>
             </select>
         </div>
         <br />
@@ -63,61 +61,3 @@
         </div>
     </form>
 </div>
-
-<script type="text/javascript">
-
-  function successCallback(data) {
-    $.blockUI({ message: '<p><h1>Just a moment while we process your payment...</h1></p>' });
-    var myForm = document.getElementById('twocheckoutCCForm');
-    myForm.token.value = data.response.token.token;
-    myForm.submit();        
-  }
-
-  function errorCallback(data) {
-    clearFields(); 
-    if (data.errorCode === 200) {
-      TCO.requestToken(successCallback, errorCallback, 'tcoCCForm');
-    } else if(data.errorCode == 401) {
-      $("#twocheckout_error_creditcard").show();
-    } else {
-      alert(data.errorMsg);
-    } 
-  }
-
-  $("#twocheckoutCCForm").submit(function (e) {
-    e.preventDefault();
-    $("#twocheckout_error_creditcard").hide();
-    TCO.requestToken(successCallback, errorCallback, 'twocheckoutCCForm');
-  });
-
-  (function($) {
-    $.QueryString = (function(a) {
-      if (a == "") return {};
-      var b = {};
-      for (var i = 0; i < a.length; ++i)
-        {
-          var p=a[i].split('=');
-          if (p.length != 2) continue;
-          b[p[0]] = decodeURIComponent(p[1].replace(/\+/g, " "));
-        }
-        return b;
-    })(window.location.search.substr(1).split('&'))
-  })(jQuery);
-  if ($.QueryString["twocheckouterror"]) {
-    $( "#twocheckout-error" ).show();
-  } else {
-      $( "#twocheckout-error" ).hide();
-  }
-
-  $('.numeric').on('blur', function () {
-    this.value = this.value.replace(/[^0-9]/g, '');
-  });
-
-  function clearFields () {
-    $('#ccNo').val('');
-    $('#expMonth').val('');
-    $('#expYear').val('');
-    $('#cvv').val('');
-  }
-
-</script>
