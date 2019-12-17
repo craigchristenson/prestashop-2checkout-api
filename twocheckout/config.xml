@@ -2,7 +2,7 @@
         <module>
             <name>twocheckout</name>
             <displayName><![CDATA[2Checkout Payment API]]></displayName>
-            <version><![CDATA[0.1]]></version>
+            <version><![CDATA[0.2]]></version>
             <description><![CDATA[Accept payments using 2Checkout Payment API]]></description>
             <author><![CDATA[]]></author>
             <tab><![CDATA[payments_gateways]]></tab>
